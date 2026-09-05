@@ -4,7 +4,7 @@ import numpy as np
 from nba_api.stats.endpoints import shotchartdetail
 
 # 1. FETCH RAW DATA
-def fetch_shot_data(season="2023-24", player_id=0):
+def fetch_shot_data(season="2025-26", player_id=0):
     """
     Pulls shot chart data from the NBA stats API.
     player_id=0 fetches league-wide data, or pass a specific player ID.
@@ -66,7 +66,7 @@ def clean_shot_data(df):
     """
     # Select only the relevant modeling columns
     columns_to_keep = [
-        "PLAYER_NAME", "TEAM_NAME", "PERIOD", "MINUTES_REMAINING", 
+        "GAME_ID", "GAME_EVENT_ID", "PLAYER_NAME", "TEAM_NAME", "PERIOD", "MINUTES_REMAINING", 
         "SECONDS_REMAINING", "ACTION_TYPE", "SHOT_TYPE", "SHOT_ZONE_BASIC", 
         "LOC_X", "LOC_Y", "SHOT_DISTANCE", "CALCULATED_DIST", 
         "SHOT_ANGLE", "SHOT_VALUE", "TARGET", "ACTION_GROUP"
@@ -81,7 +81,7 @@ def clean_shot_data(df):
 
 # 4. MAIN PIPELINE EXECUTION
 def main():
-    raw_df = fetch_shot_data(season="2023-24", player_id=0) # 0 for all players, or test with Steph Curry: 201939
+    raw_df = fetch_shot_data(season="2025-26", player_id=0) # 0 for all players, or test with Steph Curry: 201939
     clean_df = engineer_shot_features(raw_df)
     final_df = clean_shot_data(clean_df)
     
