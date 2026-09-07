@@ -10,26 +10,18 @@ Box scores shooting percentages are often misleading. The NBA is heavily reliant
 I wanted to build a tool that lets me explore practical machine learning whilst working on something I care about. I have always loved basketball, and sports tech is a field I would like to pursue.
 ---
 
-# How It Works
-```text
-[NBA Stats API]
-|[Shotchart Detail (2025-26 NBA Season)]
-↓
-[Feature Engineering]
-|Shot Angle: arctan2(LOC_X, LOC_Y)
-|Distance: Euclidean scaling from tenths of a foot
-|Action clustering:70+ raw action types -> 8 archetypes
-↓
-[HistGradientBoostingClassifier]
-|Trained on spatial & clock features
-|Evaluated with Log Loss & Brier Score (probability calibration)
-|Outputs expected conversion (xFG%) per attempt
-↓
-[Interactive dashboard]
-|Plotly half-court with click-to-inspect shot markers 
-|2K-style difficulty & contest meters
-|Zone efficiency audit (Actual vs Expected)
-```
+## How it works
+
+1. **Data ingestion** — Pulls shot chart data from the NBA Stats API (2025-26 season).
+2. **Feature engineering**
+   - Shot angle: `arctan2(LOC_X, LOC_Y)`
+   - Distance: Euclidean scaling from tenths of a foot
+   - Action clustering: 70+ raw action types condensed into 8 archetypes
+3. **Model training** — A `HistGradientBoostingClassifier` trained on spatial and clock features, evaluated with Log Loss and Brier Score for probability calibration. Outputs expected conversion (xFG%) per shot attempt.
+4. **Interactive dashboard**
+   - Plotly half-court visualization with click-to-inspect shot markers
+   - 2K-style difficulty and contest meters
+   - Zone efficiency audit (actual vs. expected)
 ---
 
 ## Key Metrics Explained
