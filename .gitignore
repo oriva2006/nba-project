@@ -13,5 +13,8 @@ Thumbs.db
 
 # Any exploratory scratchpads or test scripts
 test_video.py
-*.ipynb_checkpoints/
+.ipynb_checkpoints/
 test_env.py
+
+raw_shots.csv
+shots_cleaned_old.csv

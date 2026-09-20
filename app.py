@@ -98,6 +98,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+st.caption("xFG% uses shot location, shot type and game clock only. It has no defender or shot-clock data.")
 # 2. MODEL & DATA LOADERS
 @st.cache_resource
 def load_model():
@@ -221,17 +222,21 @@ player_df = df[
     (df["PLAYER_NAME"] == selected_player) & 
     (df["SHOT_ZONE_BASIC"].isin(zone_filter))
 ].copy().reset_index(drop=True)
+player_df["ROW_ID"] = player_df.index
 
 metrics = calculate_player_metrics(df, selected_player)
 headshot_url = get_player_headshot_url(selected_player)
 
 # Status Badge
-if metrics['delta'] >= 2.0:
-    badge_html = f'<span class="badge-hot">🔥 Hot Shot Maker (+{metrics["delta"]}%)</span>'
+MIN_FGA = 200
+if metrics["total"] < MIN_FGA:
+    badge_html = '<span class="badge-neutral">📉 Small sample</span>'
+elif metrics['delta'] >= 2.0:
+    badge_html = f'<span class="badge-hot">🔥 Hot Shot Maker (+{metrics["delta"]} pts)</span>'
 elif metrics['delta'] <= -2.0:
-    badge_html = f'<span class="badge-cold">❄️ Cold Streaker ({metrics["delta"]}%)</span>'
+    badge_html = f'<span class="badge-cold">❄️ Below Expectation ({metrics["delta"]} pts)</span>'
 else:
-    badge_html = f'<span class="badge-neutral">⚖️ Neutral Baseline ({metrics["delta"]:+.1f}%)</span>'
+    badge_html = f'<span class="badge-neutral">⚖️ Neutral Baseline ({metrics["delta"]:+.1f} pts)</span>'
 
 team_name = player_df["TEAM_NAME"].iloc[0] if len(player_df) > 0 else "NBA"
 
@@ -241,7 +246,7 @@ st.markdown(f"""
     <img src="{headshot_url}" class="player-photo" onerror="this.style.display='none'">
     <div class="player-title">
         <h1>{selected_player}</h1>
-        <p>{team_name} | 2023-24 NBA Shot Quality Scouting Report</p>
+        <p>{team_name} | 2025-26 NBA Shot Quality Scouting Report</p>
         <div style="margin-top: 8px;">{badge_html}</div>
     </div>
 </div>
@@ -252,7 +257,7 @@ m1, m2, m3, m4, m5 = st.columns(5)
 m1.metric("Total FGA", f"{metrics['total']}")
 m2.metric("Actual FG%", f"{metrics['actual_fg']}%")
 m3.metric("Expected xFG%", f"{metrics['exp_fg']}%")
-m4.metric("Shooting Delta", f"{metrics['actual_fg']}%", delta=f"{metrics['delta']:+.1f}%")
+m4.metric("Shooting Delta", f"{metrics['delta']:+.1f} pts")
 m5.metric("Avg Point Yield", f"{metrics['avg_xpts']} pts")
 
 st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
@@ -275,7 +280,7 @@ with col_court:
                 marker=dict(color="#ff3366", size=8, symbol="x", opacity=0.8),
                 customdata=np.stack((
                     misses["ACTION_GROUP"], misses["SHOT_DISTANCE"], 
-                    (misses["XFG"] * 100).round(1), misses["GAME_EVENT_ID"]
+                    (misses["XFG"] * 100).round(1), misses["ROW_ID"]
                 ), axis=-1),
                 hovertemplate=(
                     "<b>❌ MISS</b><br>" +
@@ -294,7 +299,7 @@ with col_court:
                 marker=dict(color="#00e676", size=9, symbol="circle", opacity=0.9, line=dict(width=1, color="#000000")),
                 customdata=np.stack((
                     makes["ACTION_GROUP"], makes["SHOT_DISTANCE"], 
-                    (makes["XFG"] * 100).round(1), makes["GAME_EVENT_ID"]
+                    (makes["XFG"] * 100).round(1), makes["ROW_ID"]
                 ), axis=-1),
                 hovertemplate=(
                     "<b>✅ MAKE</b><br>" +
@@ -304,14 +309,6 @@ with col_court:
                 )
             ))
 
-    event = st.plotly_chart(
-        fig, 
-        use_container_width=True, 
-        config={"displayModeBar": False},
-        on_select="rerun",
-        selection_mode="points",
-        key="shot_chart"
-    )
 
     # 2K Zone Hot/Cold Breakdown
     if len(player_df) > 0:
@@ -327,62 +324,68 @@ with col_court:
         )
         st.dataframe(zone_summary, use_container_width=True, hide_index=True)
 
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"displayModeBar": False},
+        on_select="rerun",
+        selection_mode="points",
+        key="shot_chart"
+    )
 with col_film:
     st.markdown("### 📋 Shot Quality & Value Breakdown")
-    
-    st.markdown("### 📋 Shot Quality & Value Breakdown")
-    
+
     if len(player_df) > 0:
-        # Create the standard label for all shots
         player_df["SHOT_LABEL"] = player_df.apply(
-            lambda r: f"#{r['GAME_EVENT_ID']} | Q{r['PERIOD']} {r['MINUTES_REMAINING']}:{str(r['SECONDS_REMAINING']).zfill(2)} - {r['ACTION_GROUP']} ({r['SHOT_DISTANCE']}ft) - {'MAKE' if r['TARGET'] == 1 else 'MISS'}", 
+            lambda r: f"#{r['GAME_EVENT_ID']} | Q{r['PERIOD']} {r['MINUTES_REMAINING']}:{str(r['SECONDS_REMAINING']).zfill(2)} - {r['ACTION_GROUP']} ({r['SHOT_DISTANCE']}ft) - {'MAKE' if r['TARGET'] == 1 else 'MISS'}",
             axis=1
         )
-        
-        # Determine the selected shot
-        selected_event_id = None
-        
-        # 1. Check if a point was clicked on the Plotly chart
-        if "shot_chart" in st.session_state:
-            selection = st.session_state.shot_chart.selection
-            if selection and selection["points"]:
-                # The GAME_EVENT_ID is stored at index 3 in our customdata stack
-                clicked_customdata = selection["points"][0]["customdata"]
-                selected_event_id = clicked_customdata[3]
+        label_map = dict(zip(player_df["ROW_ID"], player_df["SHOT_LABEL"]))
 
-        # 2. Filter the row based on the click, or default to the selectbox
-        if selected_event_id:
-            shot_row = player_df[player_df["GAME_EVENT_ID"] == selected_event_id].iloc[0]
-            
-            # Keep the selectbox in sync with the clicked point
-            selected_label = st.selectbox(
-                "Select Attempt to Analyze", 
-                player_df["SHOT_LABEL"].tolist(),
-                index=player_df.index[player_df['GAME_EVENT_ID'] == selected_event_id].tolist()[0]
-            )
-        else:
-            selected_label = st.selectbox("Select Attempt to Analyze", player_df["SHOT_LABEL"].tolist())
-            shot_row = player_df[player_df["SHOT_LABEL"] == selected_label].iloc[0]
-        # 2. Difficulty & Contest Meter
+        # Read the chart click, if any
+        clicked_id = None
+        sel = st.session_state.get("shot_chart")
+        points = sel.selection["points"] if sel else []
+        if points:
+            clicked_id = int(points[0]["customdata"][3])
+
+        # Key includes player and filter so options never go stale
+        select_key = f"shot_select_{selected_player}_{'-'.join(zone_filter)}"
+
+        # Push a NEW click into the dropdown, so the dropdown stays usable afterwards
+        click_token = (selected_player, clicked_id)
+        if clicked_id is None:
+            st.session_state["last_click"] = None
+        elif clicked_id in label_map and st.session_state.get("last_click") != click_token:
+            st.session_state["last_click"] = click_token
+            st.session_state[select_key] = clicked_id
+
+        chosen_id = st.selectbox(
+            "Select Attempt to Analyze",
+            player_df["ROW_ID"].tolist(),
+            format_func=lambda i: label_map[i],
+            key=select_key,
+        )
+        shot_row = player_df.loc[chosen_id]
+
+        # Shot quality tier, based on xFG% only
         xfg_pct = shot_row["XFG"] * 100
-
         if xfg_pct >= 60.0:
-            diff_title = "🟢 High-Efficiency / Open Look"
+            diff_title = "🟢 High-Efficiency Look"
             diff_bar_color = "#00e676"
         elif xfg_pct >= 40.0:
-            diff_title = "🟡 Standard / Lightly Contested"
+            diff_title = "🟡 Average Look"
             diff_bar_color = "#f39c12"
         else:
-            diff_title = "🔴 High-Difficulty / Contested Look"
+            diff_title = "🔴 Low Quality Look"
             diff_bar_color = "#ff3366"
 
         outcome_color = "#00e676" if shot_row['TARGET'] == 1 else "#ff3366"
         outcome_text = "Made" if shot_row['TARGET'] == 1 else "Missed"
 
-        # 3. 2K Scouting HUD Card (Dedented to prevent markdown code block parsing)
         hud_html = textwrap.dedent(f"""
         <div style="background-color: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 18px; margin-bottom: 16px;">
-            <p style="margin: 0 0 4px 0; font-size: 0.8rem; color: #8b949e; text-transform: uppercase; font-weight: 700;">Difficulty Assessment</p>
+            <p style="margin: 0 0 4px 0; font-size: 0.8rem; color: #8b949e; text-transform: uppercase; font-weight: 700;">Shot Quality (xFG%)</p>
             <p style="margin: 0 0 8px 0; font-weight: bold; color: {diff_bar_color};">{diff_title}</p>
             <div style="background-color: #30363d; border-radius: 6px; height: 10px; width: 100%; overflow: hidden; margin-bottom: 14px;">
                 <div style="background-color: {diff_bar_color}; width: {xfg_pct:.1f}%; height: 100%;"></div>
@@ -396,10 +399,9 @@ with col_film:
         """)
         st.markdown(hud_html, unsafe_allow_html=True)
 
-        # 4. Shot Diet & Efficiency Breakdown Table
         st.markdown("#### 📊 Shot Diet & Expected Efficiency")
         player_df["xPTS"] = player_df["XFG"] * player_df["SHOT_VALUE"]
-        
+
         shot_diet = player_df.groupby("ACTION_GROUP").agg(
             Attempts=("TARGET", "count"),
             Actual_FG=("TARGET", lambda x: f"{(x.mean() * 100):.1f}%"),
