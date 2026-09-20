@@ -65,19 +65,22 @@ Initially, I attempted to stream broadcast replays inside the app using the NBA'
 ---
 
 ## Quickstart
+### macOS / Linux
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/](https://github.com/)<YOUR_USERNAME>/<YOUR_REPO_NAME>.git
-cd <YOUR_REPO_NAME>
-
-# 2. Set up virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: .\venv\Scripts\activate
-
-# 3. Install dependencies
+git clone https://github.com/oriva2006/nba-project.git
+cd nba-project
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-
-# 4. Run the dashboard
+streamlit run app.py
+```
+### PowerShell (Windows)
+```PowerShell
+git clone https://github.com/oriva2006/nba-project.git
+cd nba-project
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 streamlit run app.py
 ```
